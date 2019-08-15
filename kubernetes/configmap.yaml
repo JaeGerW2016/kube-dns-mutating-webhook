@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nodednsconfig
+  namespace: kube-system
+data:
+  nodednsconfig.yaml: |
+    nameservers:
+      - 192.168.2.1
+    options:
+      - name: edns0

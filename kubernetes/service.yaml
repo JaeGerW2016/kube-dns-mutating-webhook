@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dns-config-injector
+  namespace: kube-system
+  labels:
+    app: dns-config-injector
+spec:
+  ports:
+    - port: 443
+      targetPort: 443
+  selector:
+    app: dns-config-injector
