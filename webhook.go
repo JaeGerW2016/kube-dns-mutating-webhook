@@ -114,7 +114,7 @@ func mutationRequired(ignorednamespacesList []string, metadata *metav1.ObjectMet
 	}
 
 	annotations := metadata.GetAnnotations()
-	if annotations != nil {
+	if annotations == nil {
 		annotations = map[string]string{}
 	}
 

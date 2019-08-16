@@ -35,4 +35,4 @@ spec:
             secretName: dns-config-injector
         - name: webhook-config
           configMap:
-            name: nodednsconfig
+            name: dnsconfig
