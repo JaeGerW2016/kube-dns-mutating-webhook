@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/golang/glog"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"k8s.io/api/admission/v1beta1"
@@ -11,7 +12,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/klog"
 	"net/http"
 	"strings"
 )
@@ -66,14 +66,14 @@ func loadConfig(configFile string) (*corev1.PodDNSConfig, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
-	klog.Infof("Load DNS configuration [%#v]", cfg)
+	glog.Infof("Load DNS configuration [%#v]", cfg)
 	return &cfg, nil
 }
 
 func addDNSConfig(p corev1.PodSpec, config corev1.PodDNSConfig, basePath string) (patch []patchOperation) {
-	klog.Infof("Add DNS config to Pod [%#v]", config)
+	glog.Infof("Add DNS config to Pod [%#v]", config)
 	if p.DNSConfig != nil {
-		klog.Infof("Add dns config to Pod [%#v] Skipped", config)
+		glog.Infof("Add dns config to Pod [%#v] Skipped", config)
 		return []patchOperation{}
 	}
 	return append(patch, patchOperation{
@@ -108,7 +108,7 @@ func updateAnnotation(target map[string]string, added map[string]string) (patch 
 func mutationRequired(ignorednamespacesList []string, metadata *metav1.ObjectMeta) bool {
 	for _, namespace := range ignorednamespacesList {
 		if metadata.Namespace == namespace {
-			klog.Infof("Skip mutation for %v for it' in special namespace: %v", metadata.Name, metadata.Namespace)
+			glog.Infof("Skip mutation for %v for it' in special namespace: %v", metadata.Name, metadata.Namespace)
 			return false
 		}
 	}
@@ -134,7 +134,7 @@ func mutationRequired(ignorednamespacesList []string, metadata *metav1.ObjectMet
 		}
 	}
 
-	klog.Infof("Mutation policy for %v/%v: status: %q required:%v", metadata.Namespace, metadata.Name, status, required)
+	glog.Infof("Mutation policy for %v/%v: status: %q required:%v", metadata.Namespace, metadata.Name, status, required)
 	return required
 }
 
@@ -146,7 +146,7 @@ func createPatch(pod *corev1.Pod, c corev1.PodDNSConfig, annotations map[string]
 }
 
 func (whsvr *WebhookServer) serve(w http.ResponseWriter, r *http.Request) {
-	klog.Infof("Receiving webhook request ...")
+	glog.Infof("Receiving webhook request ...")
 	var body []byte
 	if r.Body != nil {
 		if data, err := ioutil.ReadAll(r.Body); err == nil {
@@ -154,13 +154,13 @@ func (whsvr *WebhookServer) serve(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(body) == 0 {
-		klog.Error("empty body")
+		glog.Error("empty body")
 		http.Error(w, "empty body", http.StatusBadRequest)
 	}
 
-	contentType := r.Header.Get("ContTent-Type")
+	contentType := r.Header.Get("Content-Type")
 	if contentType != "application/json" {
-		klog.Errorf("Content-Type: %s expect Content-Type: application/json")
+		glog.Errorf("Content-Type: %s expect Content-Type: application/json",contentType)
 		http.Error(w, "invalid Content-Type, expect `application/json`", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -168,7 +168,7 @@ func (whsvr *WebhookServer) serve(w http.ResponseWriter, r *http.Request) {
 	var admissionResponse *v1beta1.AdmissionResponse
 	ar := v1beta1.AdmissionReview{}
 	if _, _, err := deserializer.Decode(body, nil, &ar); err != nil {
-		klog.Errorf("Can't decode body: %v", err)
+		glog.Errorf("Can't decode body: %v", err)
 		admissionResponse = &v1beta1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: err.Error(),
@@ -188,13 +188,13 @@ func (whsvr *WebhookServer) serve(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := json.Marshal(admissionReview)
 	if err != nil {
-		klog.Errorf("Can't encode response: %v", err)
+		glog.Errorf("Can't encode response: %v", err)
 		http.Error(w, fmt.Sprintf("could not encode response: %v", err), http.StatusInternalServerError)
 	}
 
-	klog.Infof("Ready to write response ...")
+	glog.Infof("Ready to write response ...")
 	if _, err := w.Write(resp); err != nil {
-		klog.Errorf("Can't write response: %v", err)
+		glog.Errorf("Can't write response: %v", err)
 		http.Error(w, fmt.Sprintf("could not write response : %v", err), http.StatusInternalServerError)
 	}
 }
@@ -203,19 +203,19 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 	req := ar.Request
 	var pod corev1.Pod
 	if err := json.Unmarshal(req.Object.Raw, &pod); err != nil {
-		klog.Errorf("Could not unmarshal raw object: %v", err)
+		glog.Errorf("Could not unmarshal raw object: %v", err)
 		return &v1beta1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: err.Error(),
 			},
 		}
 	}
-	klog.Infof("AdmissionReview for kind=[%v], Namespace=%v Name=%v (%v) UID=%v patchOperation=%v UserInfo=%v",
+	glog.Infof("AdmissionReview for kind=[%v], Namespace=%v Name=%v (%v) UID=%v patchOperation=%v UserInfo=%v",
 		req.Kind, req.Namespace, req.Name, pod.Name, req.UID, req.Operation, req.UserInfo)
 
 	// determine whether to perform mutation
 	if !mutationRequired(ignoredNamespaces, &pod.ObjectMeta) {
-		klog.Infof("Skipping mutation for %s/%s due to policy check", pod.Namespace, pod.Name)
+		glog.Infof("Skipping mutation for %s/%s due to policy check", pod.Namespace, pod.Name)
 		return &v1beta1.AdmissionResponse{
 			Allowed: true,
 		}
@@ -231,7 +231,7 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 		}
 	}
 
-	klog.Infof("AdmissionResponse: patch=%v\n", patchBytes)
+	glog.Infof("AdmissionResponse: patch=%v\n", patchBytes)
 	return &v1beta1.AdmissionResponse{
 		Allowed: true,
 		Patch:   patchBytes,
