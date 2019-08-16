@@ -119,12 +119,13 @@ func mutationRequired(ignorednamespacesList []string, metadata *metav1.ObjectMet
 	}
 
 	status := annotations[admissionWebhookAnnotationStatusKey]
+	inject := annotations[admissionWebhookAnnotationInjectKey]
 
 	var required bool
 	if strings.ToLower(status) == "injected" {
 		required = false
 	} else {
-		switch strings.ToLower(annotations[admissionWebhookAnnotationInjectKey]) {
+		switch strings.ToLower(inject) {
 		case "skip":
 			required = false
 		case "true", "y", "yes", "on":
@@ -134,7 +135,11 @@ func mutationRequired(ignorednamespacesList []string, metadata *metav1.ObjectMet
 		}
 	}
 
-	glog.Infof("Mutation policy for %v/%v: status: %q required:%v", metadata.Namespace, metadata.Name, status, required)
+	if required {
+		glog.Infof("Mutation policy for %v/%v: inject: %q required:%v", metadata.Namespace, metadata.Name, inject, required)
+	} else {
+		glog.Infof("Mutation policy for %v/%v: status: %q or inject：%q required:%v", metadata.Namespace, metadata.Name, status,inject, required)
+	}
 	return required
 }
 
